@@ -72,7 +72,8 @@ def getPicoTrace(ps, ch):
     
     ps.runBlock()
     ps.waitReady()
-
+    tStart = time.time()
+    
     if len(ch)>1:
         A,l,b = ps.getDataRaw('A')
         B,l,b = ps.getDataRaw('B')
@@ -88,6 +89,8 @@ def getPicoTrace(ps, ch):
         output = getChannelSettings(ps,ch)
         output[ch] = data
         
+    output['tStart'] = tStart
+        
     return output
     
 
@@ -95,6 +98,7 @@ def getPicoTraceV(ps, ch):
     ''' Same as getPicoTrace, but returns data as voltages '''
     ps.runBlock()
     ps.waitReady()
+    tStart = time.time()
     
     
     if len(ch)>1:
@@ -111,6 +115,7 @@ def getPicoTraceV(ps, ch):
         output = getChannelSettings(ps,ch)
         output[ch] = data
         
+    output['tStart'] = tStart
     
     return output
 
@@ -155,6 +160,8 @@ def getRapidBlock(ps):
     '''Rewritten the get_data_from_rapid_block function to match above "style" '''
     ps.runBlock()
     ps.waitReady()
+    tStart = time.time()
+    
     print("collecting data")
     
     A = ps.getDataRawBulk(channel='A')[0].squeeze()
@@ -165,7 +172,7 @@ def getRapidBlock(ps):
     data['A'] = A
     data['B'] = B
     data['RangeB'] = dataSettingsB['RangeB']
-        
+    data['tStart'] = tStart    
 
     return data    
     
