@@ -19,18 +19,23 @@ def open_pico(powerConnected = True):
 def setPicoTrace(ps, ch, Vrange, t_sample, t_record, trig = 0, res = None):
     ''' Set the picoscope up for data recording/streaming, and returns the settings
     ch = 'A','B' or ['A','B']
-    Vrange,
+    Vrange, can be a list, if you want A and B to have different ranges
     t_sample,
     t_record,
     trig, defaults to 0 (no trigger) options: 'A', 'B', 'External'
-    res = 8,12,14,15,16 (only 16 if only recording 1 channel)
+    res = '8','12','14','15','16' (only 16 if only recording 1 channel)
     if res is not defined, the highest resolution will be used.
     '''
     
     #Not the best way to do this, but it'll work
     if len(ch) > 1:
-        ps.setChannel(channel='A', coupling = 'DC', VRange= Vrange)
-        ps.setChannel(channel='B', coupling = 'DC', VRange= Vrange)
+        if type(Vrange) != list:
+            ps.setChannel(channel='A', coupling = 'DC', VRange= Vrange)
+            ps.setChannel(channel='B', coupling = 'DC', VRange= Vrange)
+        else:
+            #If you define two voltage ranges
+            ps.setChannel(channel='A', coupling = 'DC', VRange= Vrange[0])
+            ps.setChannel(channel='B', coupling = 'DC', VRange= Vrange[1])
     else:
         ps.setChannel(channel= ch, coupling = 'DC', VRange= Vrange)
     
@@ -61,23 +66,113 @@ def setPicoTrace(ps, ch, Vrange, t_sample, t_record, trig = 0, res = None):
     return settings
     
 
-def getPicoTrace(ps):
+def getPicoTrace(ps, ch):
     '''Once picoscope is set up/setPicoTrace has been run, use this to get data.
     '''
     
     ps.runBlock()
     ps.waitReady()
-    A,length,boool = ps.getDataRaw()
-    return A
+
+    if len(ch)>1:
+        A,l,b = ps.getDataRaw('A')
+        B,l,b = ps.getDataRaw('B')
+        output = getChannelSettings(ps,'A')
+        settingsB = getChannelSettings(ps,'B')
+        output['Brange'] = settingsB['Range'] #Probably a better way to do this
+        output['A'] = A
+        output['B'] = B
+        
+        
+    else:
+        data,length,boool = ps.getDataRaw(ch)
+        output = getChannelSettings(ps,ch)
+        output[ch] = data
+        
+    return output
     
 
 def getPicoTraceV(ps, ch):
     ''' Same as getPicoTrace, but returns data as voltages '''
     ps.runBlock()
     ps.waitReady()
-    A = ps.getDataV(ch)
-    return A
     
+    
+    if len(ch)>1:
+        A = ps.getDataV('A')
+        B = ps.getDataV('B')
+        output = getChannelSettings(ps,'A')
+        settingsB = getChannelSettings(ps,'B')
+        output['RangeB'] = settingsB['RangeB'] #Probably a better way to do this
+        output['A'] = A
+        output['B'] = B
+        
+    else:
+        data = ps.getDataV(ch)
+        output = getChannelSettings(ps,ch)
+        output[ch] = data
+        
+    
+    return output
+
+
+def getChannelSettings(ps, ch):
+    ''' Get the voltage range, resolution and sample time for a given channel '''
+    channel = {'A':0,'B':1}
+    chNum = channel[ch]
+    t_sample = ps.sampleInterval
+    Vrange = ps.CHRange[chNum]
+    resValue = ps.resolution
+    
+    for key,value in ps.ADC_RESOLUTIONS.items():
+        if value == resValue:
+            res = int(key)
+    
+    settings = {'Range'+ch:Vrange, 'Tsample':t_sample, 'Resolution':res}
+    return settings
+  
+    
+
+def setRapidBlock(ps, ch, Vrange, nCaptures, t_sample, t_record, trig = "External",
+                  res = None):
+    '''Rewritten the 'run_rapid_block' functions to match the getPicoTrace "style"
+    ch = 'A','B','both'
+    Vrange, can be a list, if you want A and B to have different ranges
+    nCaptures, amount of data blocks returned
+    t_sample,
+    t_record,
+    trig, defaults to 'External'. options: 'A', 'B', 'External'
+    res = '8','12','14','15','16' (only 16 if only recording 1 channel)
+    if res is not defined, the highest resolution will be used.
+    '''
+    settings = setPicoTrace(ps, ch, Vrange, t_sample, t_record, trig, res)
+    #ps.setSimpleTrigger("External", threshold_V = 1.0, direction = 'Rising', timeout_ms = 15000)
+    samples_per_segment = ps.memorySegments(nCaptures)
+    ps.setNoOfCaptures(nCaptures)
+    return settings
+
+
+def getRapidBlock(ps):
+    '''Rewritten the get_data_from_rapid_block function to match above "style" '''
+    ps.runBlock()
+    ps.waitReady()
+    print("collecting data")
+    
+    A = ps.getDataRawBulk(channel='A')[0].squeeze()
+    B = ps.getDataRawBulk(channel='B')[0].squeeze()
+    data = getChannelSettings(ps,'A')
+    dataSettingsB = getChannelSettings(ps,'B')
+   
+    data['A'] = A
+    data['B'] = B
+    data['RangeB'] = dataSettingsB['RangeB']
+        
+
+    return data    
+    
+    
+    
+
+# OLD RAPID BLOCK CODE BELOW
 def run_rapid_block(ps, Vrange, n_captures, t_sample, record_length, chB = [False,False]):
 	''' Records on CH A using Rapid block mode.
 	Vrange = voltage range of channel A on pico
@@ -94,7 +189,7 @@ def run_rapid_block(ps, Vrange, n_captures, t_sample, record_length, chB = [Fals
         #05-11-18 James added option for recording chB 
         if not chB[1]:
                 chB[1] = Vrange
-        ps.setChannel(channel='B', enabled="DC", VRange=chB[1])
+                ps.setChannel(channel='B', enabled="DC", VRange=chB[1])
           
       
        
@@ -122,7 +217,7 @@ def run_rapid_block(ps, Vrange, n_captures, t_sample, record_length, chB = [Fals
 	#Pulseblaster should give 3.3V, so setting the threshold to be non-zero
 	
 	samples_per_segment = ps.memorySegments(n_captures)
-	samples_per_segment = int(record_length/t_sample)
+	#samples_per_segment = int(record_length/t_sample)
 	ps.setNoOfCaptures(n_captures)
 	
 	#data = np.zeros((n_captures, samples_per_segment), dtype=np.int16)
