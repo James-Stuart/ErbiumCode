@@ -253,7 +253,7 @@ class DAMSender(object):
         msg = b'%s '%self.pubName + pickle.dumps({name: (x,y)})
         self.sock.send(msg)
         
-    def passOnDict(self, Dict):
+    def pubDict(self, Dict):
         ''' Pickle Pico .mat  dictonary and send'''
         msg =  b'%s '%self.pubName + pickle.dumps(Dict)
         self.sock.send(msg)
@@ -327,7 +327,7 @@ if __name__=="__main__":
                     
                 testDict = {'t':t, 'A':A, 'B':B}
                 
-                ds.passOnDict(testDict)
+                ds.pubDict(testDict)
                 sleep(0.1)
         except KeyboardInterrupt():
             pass
@@ -367,7 +367,7 @@ if __name__=="__main__":
                     
                 testDict = {'t':t, 'A':A, 'B':B}
                 
-                ds.passOnDict(testDict)
+                ds.pubDict(testDict)
                 sleep(0.1)
         except KeyboardInterrupt:
             pass
