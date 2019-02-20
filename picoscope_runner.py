@@ -61,22 +61,69 @@ def setPicoTrace(ps, ch, Vrange, t_sample, t_record, trig = 0, res = None):
     return settings
     
 
-def getPicoTrace(ps):
+def getPicoTrace(ps, ch):
     '''Once picoscope is set up/setPicoTrace has been run, use this to get data.
     '''
     
     ps.runBlock()
     ps.waitReady()
-    A,length,boool = ps.getDataRaw()
-    return A
+
+    if len(ch)>1:
+        A,l,b = ps.getDataRaw('A')
+        B,l,b = ps.getDataRaw('B')
+        output = getChannelSettings(ps,'A')
+        settingsB = getChannelSettings(ps,'B')
+        output['Brange'] = settingsB['Range'] #Probably a better way to do this
+        output['A'] = A
+        output['B'] = B
+        
+        
+    else:
+        data,length,boool = ps.getDataRaw(ch)
+        output = getChannelSettings(ps,ch)
+        output[ch] = data
+        
+    return output
     
 
 def getPicoTraceV(ps, ch):
     ''' Same as getPicoTrace, but returns data as voltages '''
     ps.runBlock()
     ps.waitReady()
-    A = ps.getDataV(ch)
-    return A
+    
+    
+    if len(ch)>1:
+        A = ps.getDataV('A')
+        B = ps.getDataV('B')
+        output = getChannelSettings(ps,'A')
+        settingsB = getChannelSettings(ps,'B')
+        output['RangeB'] = settingsB['RangeB'] #Probably a better way to do this
+        output['A'] = A
+        output['B'] = B
+        
+    else:
+        data = ps.getDataV(ch)
+        output = getChannelSettings(ps,ch)
+        output[ch] = data
+        
+    
+    return output
+
+
+def getChannelSettings(ps, ch):
+    ''' Get the voltage range, resolution and sample time for a given channel '''
+    channel = {'A':0,'B':1}
+    chNum = channel[ch]
+    t_sample = ps.sampleInterval
+    Vrange = ps.CHRange[chNum]
+    resValue = ps.resolution
+    
+    for key,value in ps.ADC_RESOLUTIONS.items():
+        if value == resValue:
+            res = int(key)
+    
+    settings = {'Range'+ch:Vrange, 'Tsample':t_sample, 'Resolution':res}
+    return settings
     
 def run_rapid_block(ps, Vrange, n_captures, t_sample, record_length, chB = [False,False]):
 	''' Records on CH A using Rapid block mode.
@@ -94,7 +141,7 @@ def run_rapid_block(ps, Vrange, n_captures, t_sample, record_length, chB = [Fals
         #05-11-18 James added option for recording chB 
         if not chB[1]:
                 chB[1] = Vrange
-        ps.setChannel(channel='B', enabled="DC", VRange=chB[1])
+                ps.setChannel(channel='B', enabled="DC", VRange=chB[1])
           
       
        
@@ -121,8 +168,8 @@ def run_rapid_block(ps, Vrange, n_captures, t_sample, record_length, chB = [Fals
 	ps.setSimpleTrigger("External", threshold_V = 1.0, direction = 'Rising', timeout_ms = 15000) 
 	#Pulseblaster should give 3.3V, so setting the threshold to be non-zero
 	
-	samples_per_segment = ps.memorySegments(n_captures)
-	samples_per_segment = int(record_length/t_sample)
+	#samples_per_segment = ps.memorySegments(n_captures)
+	#samples_per_segment = int(record_length/t_sample)
 	ps.setNoOfCaptures(n_captures)
 	
 	#data = np.zeros((n_captures, samples_per_segment), dtype=np.int16)
@@ -136,11 +183,19 @@ def run_rapid_block(ps, Vrange, n_captures, t_sample, record_length, chB = [Fals
 
 
 def get_data_from_rapid_block(ps):
-	ps.waitReady()
-        print("collecting data")
-	return ps.getDataRawBulk(channel='A')[0].squeeze(),ps.getDataRawBulk(channel='B')[0].squeeze()
+    ps.waitReady()
+    print("collecting data")
+    A = ps.getDataRawBulk(channel='A')[0].squeeze()
+    B = ps.getDataRawBulk(channel='B')[0].squeeze()
+    data = getChannelSettings(ps,'A')
+    dataSettingsB = getChannelSettings(ps,'B')
+   
+    data['A'] = A
+    data['B'] = B
+    data['RangeB'] = dataSettingsB['RangeB']
+   
 
-	#return data
+    return data
 		
 def pico_plot(data, t_sample):
 	''' Plots data from the picoscope '''
