@@ -19,18 +19,23 @@ def open_pico(powerConnected = True):
 def setPicoTrace(ps, ch, Vrange, t_sample, t_record, trig = 0, res = None):
     ''' Set the picoscope up for data recording/streaming, and returns the settings
     ch = 'A','B' or ['A','B']
-    Vrange,
+    Vrange, can be a list, if you want A and B to have different ranges
     t_sample,
     t_record,
     trig, defaults to 0 (no trigger) options: 'A', 'B', 'External'
-    res = 8,12,14,15,16 (only 16 if only recording 1 channel)
+    res = '8','12','14','15','16' (only 16 if only recording 1 channel)
     if res is not defined, the highest resolution will be used.
     '''
     
     #Not the best way to do this, but it'll work
     if len(ch) > 1:
-        ps.setChannel(channel='A', coupling = 'DC', VRange= Vrange)
-        ps.setChannel(channel='B', coupling = 'DC', VRange= Vrange)
+        if type(Vrange) != list:
+            ps.setChannel(channel='A', coupling = 'DC', VRange= Vrange)
+            ps.setChannel(channel='B', coupling = 'DC', VRange= Vrange)
+        else:
+            #If you define two voltage ranges
+            ps.setChannel(channel='A', coupling = 'DC', VRange= Vrange[0])
+            ps.setChannel(channel='B', coupling = 'DC', VRange= Vrange[1])
     else:
         ps.setChannel(channel= ch, coupling = 'DC', VRange= Vrange)
     
@@ -124,7 +129,50 @@ def getChannelSettings(ps, ch):
     
     settings = {'Range'+ch:Vrange, 'Tsample':t_sample, 'Resolution':res}
     return settings
+  
     
+
+def setRapidBlock(ps, ch, Vrange, nCaptures, t_sample, t_record, trig = "External",
+                  res = None):
+    '''Rewritten the 'run_rapid_block' functions to match the getPicoTrace "style"
+    ch = 'A','B','both'
+    Vrange, can be a list, if you want A and B to have different ranges
+    nCaptures, amount of data blocks returned
+    t_sample,
+    t_record,
+    trig, defaults to 'External'. options: 'A', 'B', 'External'
+    res = '8','12','14','15','16' (only 16 if only recording 1 channel)
+    if res is not defined, the highest resolution will be used.
+    '''
+    settings = setPicoTrace(ps, ch, Vrange, t_sample, t_record, trig, res)
+    #ps.setSimpleTrigger("External", threshold_V = 1.0, direction = 'Rising', timeout_ms = 15000)
+    samples_per_segment = ps.memorySegments(nCaptures)
+    ps.setNoOfCaptures(nCaptures)
+    return settings
+
+
+def getRapidBlock(ps):
+    '''Rewritten the get_data_from_rapid_block function to match above "style" '''
+    ps.runBlock()
+    ps.waitReady()
+    print("collecting data")
+    
+    A = ps.getDataRawBulk(channel='A')[0].squeeze()
+    B = ps.getDataRawBulk(channel='B')[0].squeeze()
+    data = getChannelSettings(ps,'A')
+    dataSettingsB = getChannelSettings(ps,'B')
+   
+    data['A'] = A
+    data['B'] = B
+    data['RangeB'] = dataSettingsB['RangeB']
+        
+
+    return data    
+    
+    
+    
+
+# OLD RAPID BLOCK CODE BELOW
 def run_rapid_block(ps, Vrange, n_captures, t_sample, record_length, chB = [False,False]):
 	''' Records on CH A using Rapid block mode.
 	Vrange = voltage range of channel A on pico
@@ -168,7 +216,7 @@ def run_rapid_block(ps, Vrange, n_captures, t_sample, record_length, chB = [Fals
 	ps.setSimpleTrigger("External", threshold_V = 1.0, direction = 'Rising', timeout_ms = 15000) 
 	#Pulseblaster should give 3.3V, so setting the threshold to be non-zero
 	
-	#samples_per_segment = ps.memorySegments(n_captures)
+	samples_per_segment = ps.memorySegments(n_captures)
 	#samples_per_segment = int(record_length/t_sample)
 	ps.setNoOfCaptures(n_captures)
 	
@@ -183,19 +231,11 @@ def run_rapid_block(ps, Vrange, n_captures, t_sample, record_length, chB = [Fals
 
 
 def get_data_from_rapid_block(ps):
-    ps.waitReady()
-    print("collecting data")
-    A = ps.getDataRawBulk(channel='A')[0].squeeze()
-    B = ps.getDataRawBulk(channel='B')[0].squeeze()
-    data = getChannelSettings(ps,'A')
-    dataSettingsB = getChannelSettings(ps,'B')
-   
-    data['A'] = A
-    data['B'] = B
-    data['RangeB'] = dataSettingsB['RangeB']
-   
+	ps.waitReady()
+        print("collecting data")
+	return ps.getDataRawBulk(channel='A')[0].squeeze(),ps.getDataRawBulk(channel='B')[0].squeeze()
 
-    return data
+	#return data
 		
 def pico_plot(data, t_sample):
 	''' Plots data from the picoscope '''
