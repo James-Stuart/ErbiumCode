@@ -292,7 +292,7 @@ if __name__=="__main__":
         app = pg.QtGui.QApplication([])
         dam1 = DockAreaManager(name="Test")
         damListener = DAMListenerPico(dam=dam1)
-        damListener.startUpdating(500)#, analysis)
+        damListener.startUpdating(90)#, analysis)
         if 0:#(sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION') and 0:
             print("Application bit \n Nothing recieved:")
             pg.QtGui.QApplication.instance().exec_()
@@ -347,25 +347,32 @@ if __name__=="__main__":
                 ###############################################################
                 #Making a fake picoscope trace
                 tt = time.time()
-                A = np.sin(200*np.pi*x+ tt/10.) + 0.4*np.random.normal(size=x.size)
-                picoData = {'A':A, 'RangeA': 1.0, 'Resolution': 16, 'Tsample':1e-3, 'Tstart':tt}
+                A = 2**15*(np.sin(200*np.pi*x+ tt/10.) + 0.4*np.random.normal(size=x.size))
+                picoData = {'A':A, 'RangeA': 1.0, 'Resolution': 16, 'Tsample':1e-3, 'tStart':tt}
                 ###############################################################
                 
                 if 'A' not in picoData:
                     A = None
                 else:
                     A = picoData['A']
-                    t = np.arange(picoData['tStart'],A.shape[0])*picoData['Tsample']
+                    RangeA = picoData['RangeA']
+                    t = np.arange(A.shape[0])*picoData['Tsample']
+                    
+                    #Convert picoData to voltages
+                    A *= 1/(2**(picoData['Resolution']-1))*RangeA
                     
                 if 'B' not in picoData:
                     B = None
                 else:
                     B = picoData['B']
-                    t = np.arange(picoData['tStart'],B.shape[0])*picoData['Tsample']                    
+                    RangeB = picoData['RangeB']
+                    t = np.arange(B.shape[0])*picoData['Tsample']                  
+                    
+                    #Convert picoData to voltages
+                    B *= 1/(2**(picoData['Resolution']-1))*RangeB
                 
 
-                    
-                testDict = {'t':t, 'A':A, 'B':B}
+                testDict = {'t':t, 'A':A, 'B':B, 'tStart':picoData['tStart']}
                 
                 ds.pubDict(testDict)
                 sleep(0.1)
