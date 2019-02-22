@@ -30,6 +30,7 @@ class DockAreaManager(object):
         self.area=area
         self.dockD={}
         self.win=win
+        self.isPaused = False #By default the updating is not paused 
 
         #Save area
         saveDock=Dock("saveArea", size=(10,10))
@@ -38,16 +39,30 @@ class DockAreaManager(object):
         saveBtn = pg.QtGui.QPushButton('Save state')
         restoreBtn = pg.QtGui.QPushButton('Restore state')
         restoreBtn.setEnabled(False)
+#==============================================================================
+#         pauseBtn = pg.QtGui.QPushButton('Pause graph') #pauseBtn
+#==============================================================================
         w1.addWidget(label, row=0, col=0)
         w1.addWidget(saveBtn, row=1, col=0)
         w1.addWidget(restoreBtn, row=2, col=0)
+#==============================================================================
+#         w1.addWidget(pauseBtn, row=3, col=0) #pauseBtn
+#==============================================================================
         saveDock.addWidget(w1)
         saveBtn.clicked.connect(self.save)
         restoreBtn.clicked.connect(self.load)
+#==============================================================================
+#         pauseBtn.clicked.connect(self.pause) #pauseBtn
+#==============================================================================
         self.saveBtn=saveBtn
         self.restoreBtn=restoreBtn
         self.area.addDock(saveDock)
         self.win.show()
+        
+    def pause(self):
+        ''' A button toggles if the graph is updating. '''
+        self.isPaused = (self.isPaused+1)%2 #flip the bool
+
 
     def save(self):
         self.state = self.area.saveState()
@@ -92,13 +107,16 @@ class DockAreaManager(object):
     def updateFromDict(self, D):
         """ Update/create plots from the dictionary D containing curves to be plotted
         """
-        for key, val in D.items():
-            if len(val)>2:
-                val=(val,)
-            if key in self.dockD:
-                self.setData(key, *val)
-            else:
-                self.addDockPlot(key, *val)
+        if self.isPaused:
+            pass
+        else:
+            for key, val in D.items():
+                if len(val)>2:
+                    val=(val,)
+                if key in self.dockD:
+                    self.setData(key, *val)
+                else:
+                    self.addDockPlot(key, *val)
 
 PORT = 5561
 class DAMListener(object):
@@ -300,41 +318,43 @@ if __name__=="__main__":
 
         
         
-    def testSenderPico():
-        ''' This is meant to imitate testSender, but have the message in a 
-        .mat Picoscope style dictionary '''
-        ds = DAMSender()
-        x= np.linspace(0,1,1000)
-        
-        try:
-            while 1:
-                #Get picoscope trace, make Dictionary with t,A,B arrays  
-                
-                tt = time.time()
-                tInterval = 1 
-                if 'tStart' not in locals():
-                    tStart=0
-                A = np.sin(200*np.pi*x+ tt/10.) + 0.4*np.random.normal(size=x.size)
-                
-                #I dont like this...
-                if 'A' not in locals():
-                    A = None
-                    t = np.arange(tStart,B.shape[0])*tInterval
-                        
-                if 'B' not in locals():
-                    B = None
-                    t = np.arange(tStart,A.shape[0])*tInterval
-                    
-                testDict = {'t':t, 'A':A, 'B':B}
-                
-                ds.pubDict(testDict)
-                sleep(0.1)
-        except KeyboardInterrupt():
-            pass
-        finally:
-            ds.close()
+#==============================================================================
+#     def testSenderPico():
+#         ''' This is meant to imitate testSender, but have the message in a 
+#         .mat Picoscope style dictionary '''
+#         ds = DAMSender()
+#         x= np.linspace(0,1,1000)
+#         
+#         try:
+#             while 1:
+#                 #Get picoscope trace, make Dictionary with t,A,B arrays  
+#                 
+#                 tt = time.time()
+#                 tInterval = 1 
+#                 if 'tStart' not in locals():
+#                     tStart=0
+#                 A = np.sin(200*np.pi*x+ tt/10.) + 0.4*np.random.normal(size=x.size)
+#                 
+#                 #I dont like this...
+#                 if 'A' not in locals():
+#                     A = None
+#                     t = np.arange(tStart,B.shape[0])*tInterval
+#                         
+#                 if 'B' not in locals():
+#                     B = None
+#                     t = np.arange(tStart,A.shape[0])*tInterval
+#                     
+#                 testDict = {'t':t, 'A':A, 'B':B}
+#                 
+#                 ds.pubDict(testDict)
+#                 sleep(0.1)
+#         except KeyboardInterrupt():
+#             pass
+#         finally:
+#             ds.close()
+#==============================================================================
             
-    def testSenderPico(tInterval,data):
+    def testSenderPico():
         ''' This is meant to imitate testSender, but have the message in a 
         .mat Picoscope style dictionary '''
         ds = DAMSender()
@@ -372,7 +392,7 @@ if __name__=="__main__":
                     B *= 1/(2**(picoData['Resolution']-1))*RangeB
                 
 
-                testDict = {'t':t, 'A':A, 'B':B, 'tStart':picoData['tStart']}
+                testDict = {'t':t, 'A':A, 'B':B}#, 'tStart':picoData['tStart']}
                 
                 ds.pubDict(testDict)
                 sleep(0.1)
