@@ -311,7 +311,7 @@ if __name__=="__main__":
         dam1 = DockAreaManager(name="Test")
         damListener = DAMListenerPico(dam=dam1)
         damListener.startUpdating(90)#, analysis)
-        if 0:#(sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION') and 0:
+        if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION') and 0:
             print("Application bit \n Nothing recieved:")
             pg.QtGui.QApplication.instance().exec_()
         return damListener
@@ -376,7 +376,7 @@ if __name__=="__main__":
                 else:
                     A = picoData['A']
                     RangeA = picoData['RangeA']
-                    t = np.arange(A.shape[0])*picoData['Tsample']
+                    t = np.arange(A.shape[0])*picoData['Tsample'] + picoData['tStart']
                     
                     #Convert picoData to voltages
                     A *= 1/(2**(picoData['Resolution']-1))*RangeA
@@ -386,13 +386,13 @@ if __name__=="__main__":
                 else:
                     B = picoData['B']
                     RangeB = picoData['RangeB']
-                    t = np.arange(B.shape[0])*picoData['Tsample']                  
+                    t = np.arange(B.shape[0])*picoData['Tsample'] + picoData['tStart']                 
                     
                     #Convert picoData to voltages
                     B *= 1/(2**(picoData['Resolution']-1))*RangeB
                 
 
-                testDict = {'t':t, 'A':A, 'B':B}#, 'tStart':picoData['tStart']}
+                testDict = {'t':t, 'A':A, 'B':B}
                 
                 ds.pubDict(testDict)
                 sleep(0.1)
