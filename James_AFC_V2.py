@@ -34,7 +34,10 @@ import purephotonicscontrol.ITLA_Wrap as ITLA_Wrap
 import ads7_multichirper as mc
 ## import new_1550_laser as las
 
-
+#Pulse blaster commands
+WAIT = 8 #From the Pulseblaster code. for telling Pb to wait for trigger
+LOOP = 2
+END_LOOP = 3
 
 
 Hz = 1
@@ -146,10 +149,7 @@ def spin_jump(freq,state = '3,2',rec = 'True', span = 20*MHz, teeth = 1, f_ext =
     #Splittings are [107.64, 110.42,105.17,92.34,73.02,47.94]
     #delta m = -1 energy gaps 7/2 -> -7/2: [0, -107.64, -218.06, -323.23, -415.57, -488.59, -536.53]+some offset
     state_dict = {'3,2': 0,'1,2': 1,'-1,2': 2,'-3,2': 3,'-5,2': 4,'-7,2': 5}
-    if state == '5,2':
-        print("Use function spin_jump_dmneg1 instead")
-        raise RuntimeError("I'm afraid I cannot do that Dave, burning on the Delta m = -2 means the highst hyperfine I can get to is |3/2>.")
-        
+
     if state not in state_dict: #Check if variable state is valid
         print('Error, variable state must be in [3,2 ... -7,2]')
         
@@ -159,7 +159,7 @@ def spin_jump(freq,state = '3,2',rec = 'True', span = 20*MHz, teeth = 1, f_ext =
     #I am keeping the -107.64 to allow the ability to image the 5/2> easily
     #DELTA M=-2 |7/2> location is -903.02MHz
     e_gap = np.array([-107.60, -218.09, -323.2, -415.50, -488.20, -535.89, 460.99])*MHz #Gaps in hyperfine energy levels
-##     e_gap = np.array([0, -107.60, -218.09, -323.2, -415.50, -488.20, -535.89, 460.99])*MHz #Gaps in hyperfine energy levels
+##     e_gap = np.array([0, -107.60, -218.09, -323.2, -415.50, -488.20, -535.89, 460.99])*MHz #GUse this if you want to look at one hyperfine higher
 ##     e_gap = np.array([1685.0, 1603.5, 1530.0, 1472.2, 1436.3, 1428.8, 1453.5])*MHz #Use this to look at dm = 1
 ##     e_gap = np.array([1557, 1557, 1557, 1557, 1557, 1557, 1557])*MHz #Set span to 270MHz and use this to image the entire DM = 1
     #From 7/2 - 5/2 -> -5/2 - -7/2 (have the image the -7/2> on the Delta m = 0
@@ -187,187 +187,9 @@ def spin_jump(freq,state = '3,2',rec = 'True', span = 20*MHz, teeth = 1, f_ext =
 
     #SIH.free_run_plot_window('Y',full_span = 'Y')
     
-def spin_jump_dmneg1(freq,state = '5,2',rec = 'True', span = 20*MHz):
-    ''' Sets the 8GB AWG to a given frequency and burns a 100kHz hole, gives the option to 
-        record the anti-hole created.
-        Then burns on top of the anti-hole with a larger chirp 500 kHz - 2 MHz 
-        '''
-    #Splittings are [107.64, 110.42,105.17,92.34,73.02,47.94]
-    #delta m = -1 energy gaps 7/2 -> -7/2: [0, -107.64, -218.06, -323.23, -415.57, -488.59, -536.53]+some offset
-    state_dict = {'5,2': 0,'3,2': 1,'1,2': 2,'-1,2': 3,'-3,2': 4,'-5,2': 5,'-7,2': 6}
-    if state not in state_dict: #Check if variable state is valid
-        print('Error, variable state must be in [5/2, 3/2... -7/2]')
-        
-    print("Initial burn on the Delta m = -1")
-    target_state = state_dict[state]
-
-    e_gap = np.array([-107.64, -218.06, -323.23, -415.57, -488.59, -536.53, 460.32])*MHz #Gaps in hyperfine energy levels
-    #From 7/2 - 5/2 -> -3/2 - -5/2
-    str_name = [' spin jumped 5,2 antihole',' spin jumped 3,2 antihole',' spin jumped 1,2 antihole',' spin jumped -1,2 antihole',
-    ' spin jumped -3,2 antihole',' spin jumped -5,2 antihole',' spin jumped -7,2 antihole']
-    
-    #Perform the first burn (which should have a narrower chiep and quicker burn time
-    if target_state >= 0:
-        mc.setWvfm(0,teeth-1)
-        burn_sequence_AWG(burn = 200*ms, burn_freq= freq, record = rec, rec_freq = freq - 107.64*MHz, rec_span = span, f_name = ' spin jumped 5,2 antihole via dm1')# ' + str(i))
-    
-    #Perform the rest of the spin jump down to the desired level.
-    #Cant look at the anti-hole in each level though
-    j = target_state
-    print(target_state)
-    if target_state > 0:
-##         mc.setWvfm(teeth,teeth*(j+1)-1)#No  Comb clean up. 
-        mc.setWvfm(teeth,teeth*(j+2))  #For Comb clean up.
-        burn_sequence_AWG(burn = 500*ms*(j), burn_freq= freq+e_gap[j-1], record = rec, rec_freq = freq+e_gap[j], rec_span = span, f_name = str_name[j] + ' via dm1')
-#
-
-#
-def spin_jump_time_measurement(freq, times, state = '5,2'):
-    ''' OLDER SLOWER VERSION, USE ONLY IF NEW ONE BROKE
-        Preforms spin jump to a certain hyperfine and then records the anti-hole a give time
-        after the hole was originally burnt '''
-    HP8560E_SpecAn_Trigger('EXT', 'SNGLS', SpecAn)
-    sp = 10*MHz
-    
-    state_dict = {'5,2': 0,'3,2': 1,'1,2': 2,'-1,2': 3,'-3,2': 4,'-5,2': 5}
-    if state not in state_dict: #Check if variable state is valid
-        print('Error, variable state must be in [5/2, 3/2... -5/2]')
-    
-    p = state_dict[state]
-    e_gap = np.array([-107.64, -217.98, -323.19, -415.47, -488.22, -536.46])*MHz #Gaps in hyperfine energy levels
-    
-    #Record background measurements
-    HP8560E_SpecAn_Trigger("FREE", 'CONTS', SpecAn)
-    pb.Sequence([(['ch2','ch5'], 1*ms)], loop=False)
-    hb.run_offset(SpecAn, freq = freq+e_gap[p], span = sp, res = 30*kHz, sweep = 50*ms, full_span = 'N', show_window = 'N',n = 5)
-    
-    #Spin Jump
-    HP8560E_SpecAn_Trigger('EXT', 'SNGLS', SpecAn)
-    spin_jump(freq,state,rec = 'False',span = sp)
-    
-
-    
-    #Stop SpecAn sweeping over anti hole, burn final anti-hole and then suppresses carrier
-    #Take spectra at time '0'
-    HP8560E_SpecAn_Trigger("FREE", 'CONTS', SpecAn) #Record
-    SpecAn.write("CF " + str(freq + e_gap[p]))
-    SpecAn.write("SP " + str(sp))
-    filepath = hb.create_file(SpecAn, compensated = 'Y', n=1, burn_time = 0, filename = ' '+ state +' zero ' + str(time[i]) + 's')
-    pb.Sequence([   (['ch5'], 1*s),
-                    (['ch2','ch4','ch5'], 70*ms), #RF Switch, Trigger SpecAn, EOM Bias on 
-                    ([ ], 100*ms),              #turn off ch2,ch5, suppress carrier/RF
-                    ], loop=False)  
-    hb.record_trace(SpecAn, filepath, compensated = 'Y', sweep_again = 'Y', n=1, burn_time = '')
-    HP8560E_SpecAn_Trigger('EXT', 'SNGLS', SpecAn)    
-    
-        
-    sleep(times[i]) #wait
-    HP8560E_SpecAn_Trigger("FREE", 'CONTS', SpecAn) #Record
-    filepath = hb.create_file(SpecAn, compensated = 'Y', n=1, burn_time = 0, filename = ' '+ state +' ' + str(time[i]) + 's')
-    pb.Sequence([   (['ch5'], 1*s),
-                    (['ch2','ch4','ch5'], 70*ms), #RF Switch, Trigger SpecAn, EOM Bias on 
-                    (['ch2','ch5'], 100*ms),
-                    ], loop=False)  
-    hb.record_trace(SpecAn, filepath, compensated = 'Y', sweep_again = 'Y', n=1, burn_time = '')
-    HP8560E_SpecAn_Trigger('EXT', 'SNGLS', SpecAn)    
-        
-def spin_jump_time_measurement_faster(times, burn_f, state = '5,2'):
-    ''' Spin polarizes and spin jumps the ensemble to a given [state].
-        Then it records the anti-hole after a certain amount of time given by [times]
-        This one is faster because it spin polarizes every n recordings rather than
-        every recording.'''
-    freq = burn_f
-    count = 4
-    sp = 20*MHz
-##     sp = 2.9*GHz
-    
-    state_dict = {'5,2': 0,'3,2': 1,'1,2': 2,'-1,2': 3,'-3,2': 4,'-5,2': 5,'-7,2': 6}
-    if state not in state_dict: #Check if variable state is valid
-        print('Error, variable state must be in [5,2, 3,2... -5,2]')
-    
-    p = state_dict[state]
-    e_gap = np.array([-107.60, -218.09, -323.2, -415.50, -488.20, -535.89, 1453.5])*MHz #Gaps in hyperfine energy levels
-    
-    pl.ioff()    
-    for i in range(len(times)):
-        count += 1
-
-    
-        if count == 5:
-            count = 0
-            
-            HP8560E_SpecAn_Trigger("FREE", 'CONTS', SpecAn)
-            
-            SpecAn.write('CF ' + str(1.45*GHz))
-            SpecAn.write('SP ' + str(2.9*GHz))
-            spin_pump_seq(spintime = 10*s, SpecAnSweep = 'Y', rec = 'N')
-        
-            #Record background measurements
-            HP8560E_SpecAn_Trigger("FREE", 'CONTS', SpecAn)
-            pb.Sequence([(['ch2','ch5'], 1*ms)], loop=False)
-            hb.run_offset(SpecAn, freq = freq+e_gap[p], span = sp, res = 30*kHz, sweep = 50*ms, full_span = 'N', show_window = 'N',n = 5)
-##             hb.run_offset(SpecAn, freq = 1.45*GHz, span = 2.9*GHz, res = 30*kHz, sweep = 50*ms, full_span = 'N', show_window = 'N',n = 5)
-
-
-            #Stop SpecAn sweeping over anti hole, burn final anti-hole and then suppresses carrier
-            HP8560E_SpecAn_Trigger('EXT', 'SNGLS', SpecAn)
-        
-        
-            #Spin Jump
-            spin_jump(freq,state,rec = 'False',span = sp, teeth = 1)
-            
-                    
-            #Take spectra at time '0'
-            SpecAn.write("CF " + str(freq+e_gap[p]))
-            SpecAn.write("SP " + str(sp))
-##             SpecAn.write("CF " + str(1.45*GHz))
-##             SpecAn.write("SP " + str(2.9*GHz))
-            f_name = ' ' + state + ' zero ' + str(times[i]) + 's'
-            filepath = hb.create_file(SpecAn, compensated = 'Y', filename = f_name)
-            pb.Sequence([   (['ch5'], 1*s),
-                            (['ch2','ch4','ch5'], 70*ms), #RF Switch, Trigger SpecAn, EOM Bias on 
-                            ([ ], 100*ms),              #turn off ch2,ch5, suppress carrier/RF
-                            ], loop=False)  
-            hb.record_trace(SpecAn, filepath, compensated = 'Y', sweep_again = 'N', n=1, burn_time = '')
-            HP8560E_SpecAn_Trigger('EXT', 'SNGLS', SpecAn)    
-            
-            print('Waiting ' + str(times[i]) + ' seconds.')
-            sleep(times[i]) #wait
-
-            
-        else:
-            t = times[i] - times[i-1]
-            print('Waiting ' + str(t) + ' seconds.')
-            sleep(t)
-            
-        #Record
-        f_name = ' ' + state + ' ' + str(times[i]) + 's'
-        filepath = hb.create_file(SpecAn, compensated = 'Y', filename = f_name)
-        pb.Sequence([   (['ch5'], 1*s),
-                        (['ch2','ch4','ch5'], 70*ms), #RF Switch, Trigger SpecAn, EOM Bias on 
-                        ([ ], 100*ms),
-                        ], loop=False)  
-        fName = hb.record_trace(SpecAn, filepath, compensated = 'Y', sweep_again = 'N', n=1, burn_time = '') 
-        dat=np.loadtxt(fName, skiprows=10)
-        pl.plot(*dat.T)
-        #pl.draw()
-        plt.pause(0.1)  
-        
-    pl.show()
-    sleep(1)        
-        
-    HP8560E_SpecAn_Trigger("FREE", 'CONTS', SpecAn)    
-        
-        
-
-def all_time_measurements(t_array, burn_f, state_array):
-    
-    for hyperfine in state_array:
-        for time in t_array:
-            t = [time]
-            spin_jump_time_measurement_faster(t, burn_f, hyperfine)
-#
-
+#def spin_jump_dmneg1, is in JAMES_AFC_V1
+#def spin_jump_time_measurement(freq, times, state = '5,2'):, IS IN JAMES_AFC_V1
+#def spin_jump_time_measurement_faster(times, burn_f, state = '5,2'):, IS IN JAMES_AFC_V1
 #
 def burn_sequence_AWG(burn, burn_freq, record = 'True', rec_freq = '', rec_span = 10*MHz,
                       f_name = '', nu = 2, sa = 'Y'):
@@ -571,20 +393,7 @@ def reference_pulse(f_ext = '', voltRange = 0.2):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 #
-WAIT = 8 #From the Pulseblaster code. for telling Pb to wait for trigger
 def make_AFC(burnf, AFCparameters, recComb = False, f_ext = ''):
     '''
     Makes an AFC for the quantum AFC experiment
@@ -608,7 +417,7 @@ def make_AFC(burnf, AFCparameters, recComb = False, f_ext = ''):
         record_dm_1(burn_f, hFinal, tn=n, f_ext=f_ext)
 
 
-def run_AFC(burnf, AFCparameters, recComb = False, f_ext = '', pico_f_ext = ''):
+def makeNpulse_AFC(burnf, AFCparameters, recComb = False, shots, f_ext = '', pico_f_ext = ''):
     '''
     Uses make_AFC to create the AFC comb and then set the AWG and Picoscope to store and retrieve pulses from the AFC
     '''     
@@ -631,14 +440,15 @@ def run_AFC(burnf, AFCparameters, recComb = False, f_ext = '', pico_f_ext = ''):
     #CH3 trigger picoscope.
     #CH5 suppress carrier EOM.
     #CH1 Open RF switch for AWG.
-    for i in range(shots):
-    #1ms allows for a time gap between each shot
-        pb.Sequence([(['ch5'], 0.5*us), 
-        (['ch5'], 0.5*us, WAIT),  #50us of 'silence' then have the pulse
-        (['ch5'], 49.5*us),
-        (['ch3','ch5'], 0.5*us),  #Record just before the pulse comes in 
-        (['ch1','ch5'],t_r+10*us),#Leave enough time for the recording
-        (['ch5'], 10*us)] ,loop=False,bStart=False)
+    #CH9 Bypass the AMP going to the EOM for low light level measurements
+    pb.Sequence([
+    (['ch5','ch9'], 0.5*us, LOOP, shots), #loop shots times
+    (['ch5','ch9'], 0.5*us, WAIT),  #50us of 'silence' then have the pulse
+    (['ch5','ch9'], 49.5*us),
+    (['ch3','ch5','ch9'], 0.5*us),  #Record just before the pulse comes in 
+    (['ch1','ch5','ch9'],t_r+10*us),#Leave enough time for the recording
+    (['ch5','ch9'], 10*us, END_LOOP),
+    (['ch5'],1*us)] ,loop=False,bStart=False)
         
     sleep(0.1)
     
@@ -662,44 +472,6 @@ def run_AFC(burnf, AFCparameters, recComb = False, f_ext = '', pico_f_ext = ''):
 #
 
 #
-def comb_background_abs(burn_f = 1.1*GHz,shots = 1000, delay = 0):
-    ''' Idea: Spin pump crystal 
-              Burn a narrow hole where the AFC will be (100 kHz)
-              Send broad pulse through quickly after (>1ms after, MHz broad)
-    What comes out should give a measurement of the background where the AFC will be
-    before spin jumping.
-    
-    Turn WF on
-    Set up PS for RAPID BLOCK mode'''  
-    
-    mc.setWvfm(0)
-    sleep(0.1)
-    pb.Sequence([(['ch1','ch5'], 50*ms) , (['ch5'], 1*ms)], loop=False)
-    sleep(0.1)
-    
-    
-    AWG_trig_out()
-##     wf = wf_24_cw(burn_f + 19e6 + 460.99e6, -10)
-    mc.setWvfm(1)
-    sleep(0.1)
-    
-    arr = [(['ch5','ch6'], 10*s), (['ch5'], 20*ms)] #10s to spin pol. crystal, 20ms to let the mems switch switch.  
-    pb.Sequence(arr,loop=False)
-    time.sleep(10.1)
-    
-    pb.ProbBurnLoop(shots = 1000)
-    time.sleep(shots*7e-4) #replace this is Wvfm time length
-    
-    mc.setWvfm(2)
-    pb.ProbBurnLoop(shots = 1000)
-    time.sleep(shots*5e-4) #replace this is Wvfm time length
-
-##     AWG_trig_out(0) #Tends to turn trig off too soon
-##     wf_off(wf)
-#
-
-
-#
 def wf_13_cw(wf_freq, wf_power):
     ''' Uses Windfreak1_3 to open wf and set to CW at a given freq and power on
     high power mode.'''
@@ -712,7 +484,8 @@ def wf_13_cw(wf_freq, wf_power):
 
 
 def wf_24_cw(wf_freq, wf_power):
-    ''' Similar to wf_13_cw, for the WF V2.4'''    
+    ''' Similar to wf_13_cw, for the WF V2.4
+    power is on 'high' setting'''    
     fname = "C:\\Users\\Milos\Desktop\\Er_Experiment_Interface_Code\\3.txt" #This is not important
     #Saves the settings for the WF at the 6th line of ^,a relic from old code.
     
@@ -720,8 +493,7 @@ def wf_24_cw(wf_freq, wf_power):
     return wf_instr
     
 def wf_off(wf_instr):
-    
-    
+    '''Turn off the WF 2.4'''  
     if "wf_instr" in locals():
         wf.Windfreak_ONOFF(0,'YES',wf_instr)
     
@@ -729,6 +501,7 @@ def wf_off(wf_instr):
 
 #
 def SpecAnUnfreeze():
+    ''' Triggers the Spectrum Analyser and sets it to continuous mode.'''
     pb.Sequence([(['ch4'], 2.5*ms) , (['ch2','ch5'], 2.5*ms)], loop=False)
     HP8560E_SpecAn_Trigger('FREE', 'CONTS', SpecAn)
     
@@ -767,167 +540,50 @@ def AWG_trig_out(on = 1):
         print('AWG output trigger is on.')
     else:
         print('AWG output tigger is off.')
-    
 #
 
 
 #
-def spin_jump_record_repeat(burn_f, h_state, file_name, teeth = 1, n = 1):
-    ''' Spin poliarises the crystal once. Then repeatedly spin jump's and records the anti-hole.'''
-    HP8560E_SpecAn_Trigger('FREE', 'CONTS', SpecAn)  
-    spin_pump_seq(spintime = 10*s, SpecAnSweep = 'N', rec = 'N')
-    rec_span = 20*MHz
-    
-##     state_dict = {'3,2': 0,'1,2': 1,'-1,2': 2,'-3,2': 3,'-5,2': 4,'-7,2': 5}
-##     num = state_dict[h_state]
-##     bjt_ext = 5/num
-    
-    #Initial spin jump (longer Burn Jump Time)
-    num_len = int(np.ceil(np.log10(n)))
-    zero = '0'
-    zeros = zero*num_len
-    spin_jump(burn_f,state = h_state ,rec = 'True', span = rec_span, teeth = teeth, f_ext = file_name + ' ' + zeros, bjt = 50)#*bjt_ext) 
-    for i in range(n-1):
-        #Each subsequent spin jump should need a much shorter Burn Jump Time
-        spin_jump(burn_f,state = h_state ,rec = 'False', span = rec_span, teeth = teeth, f_ext = file_name + ' ' + str(i+1).zfill(num_len), bjt = 50, rec_offs = False)
-        
-    
-
-    #Records the 2.9GHz span after all measurements
-    filepath = hb.create_file(SpecAn, compensated = 'Y', n=1, burn_time = 0, filename = ' Spin pumped after spinjump ' + h_state)
-    sleep(100*ms)
-    pb.Sequence([   (['ch5'], 0.5*s),
-                    (['ch2','ch4','ch5'], 50*ms), #RF Switch, Trigger SpecAn, EOM Bias on 
-                    (['ch2','ch5'], 100*ms),
-                    ], loop=False)
-    hb.record_trace(SpecAn, filepath, filename = ' Spin pumped after spinjump ' + h_state, compensated = 'Y', sweep_again ='N', n=1, burn_time = '')
-
-    
-aVariable1 =1   
-
-loc = None
-glob = None
-
-
 if __name__ == "__main__":
     
     #REMEMBER TO CLOSE PS
     #pdb.set_trace()
-##     h_states = ['-5,2','-3,2','-1,2','1,2','3,2']
-##     for state in h_states:
-##     spin_jump_record_repeat(n= 1,burn_f = 1.04*GHz, h_state = '-7,2', file_name = 'test')
-##     freqs = [194.9435, 194.9436, 194.9437, 194.9438, 194.9439, 195.1618, 195.1619, 195.162, 195.1621, 195.1622]
-##     for freq in freqs:
-    t_list = [0.1,0.2,0.3,0.5,0.7,1,1.5,2,3,4,5,7,9]
-##     for t in t_list:
-##         print('\n')
-##         print('Time: ' + str(t)+'\n')
-##         print('\n')
-##             #SpinpumpSite2BurnSite1(f_name = 'Spinpump, burn at ' + str(freq) + 'THz ' + str(i), freq = freq)
-##         f_str = 'Spinpump, burn spatially seperated for ' + str(t) + ' s, delay 20s'
-##         spinpump_delay(f_name = f_str, delay = 20, secondLpath = True, latchT = t)
-##         
-##     for i in range(5):
-##         print('\n')
-##         print('Loop: ' + str(i))
-##         print('\n')
-##         spinpump_delay(f_name = 'Spinpump, delay 20s' + str(i), delay = 20, secondLpath = False)
-        
-    freq = 194.9404
-    for t in t_list:
-        print('\n')
-        print('Time: ' + str(t)+'\n')
-        print('\n')        
-        SpinpumpSite2BurnSite1(f_name = 'Spinpump, burn at ' + str(freq) + 'THz for' + str(t) + 's', freq = freq)
+    h_states = ['-5,2','-3,2','-1,2','1,2','3,2']
+
+
+    if 'ps' not in globals():
+        global ps
+        ps = pico.open_pico()
     
-##     if 'ps' not in globals():
-##         global ps
-##         ps = pico.open_pico()
+    #Various parameters for the functions below
+    burnf = 1.1e9
+    AFCparam = [1,50] #BJT is in ms
+    fext = ''
+    shots = 5
 
-##     for i in range(5):
-##         burn_f = 1.1*GHz
-##         h_state = '-7,2'
-##         file_suff = 'rec dm1 -0.99s delay' + str(i) #filename for direct comb imaging
-##         teeth = 1
-##         loc = locals()
-##         glob = globals()
-    ##     wf_24_cw(burn_f + 20e6 + 460.99e6, -10)#Freq offset from the pulses freq.
-##         f_ext = 'improved' #File name for ps recordings
-##         voltRange = 0.2
-
-##         HP8560E_SpecAn_Trigger('FREE', 'CONTS', SpecAn)     
-##         spin_pump_seq(spintime = 10*s, SpecAnSweep = 'N', rec = 'N')
-    ##     reference_pulse(f_ext, voltRange)
-
-##         save_offset_custom(SpecAn, 5, "1.txt",freq = burn_f + 1557*MHz, span = 270*MHz)
-    ##     save_offset_custom(SpecAn, 5, "2.txt",freq = burn_f + 1472*MHz, span = 20*MHz)
-    ##     save_offset_custom(SpecAn, 5, "3.txt",freq = burn_f + 1529*MHz, span = 20*MHz)
-##         spin_jump(burn_f,state = h_state ,rec = 'True', span = 270*MHz, teeth = teeth, f_ext = file_suff, bjt = 500) 
-        
-        
-##         record_dm_1(burn_f, file_suff + ' ' + h_state, tn = teeth)
+#==============================================================================
+#     # Run this just to spin pump
+#     spin_pump_seq(spintime = 10*s,SpecAnSweep = 'Y',rec ='Y')
+#     
+#     # Run this just to spin jump
+#     spin_jump(burnf,state = '3,2',rec = 'True', span = 20*MHz, teeth = 1, f_ext =fext,
+#               bjt = 50, rec_offs = True)
+# 
+#     # Run this just to make a comb and image it
+#     make_AFC(burnf, AFCparameters = AFCparam, recComb = True, f_ext = fext)
+#     
+#     # Run this to make a comb and send a pulse through it
+#     makeNpulse_AFC(burnf, AFCparameters = AFCparam, recComb = False, shots=shot, 
+#                    f_ext = fext, pico_f_ext = fext + ' pico')
+#==============================================================================
     
-    ##########################################################################
-##     shots=10
-##     
-##     ########################################################################## 
-##     #Set AWG to output storage pulse
-##     mc.setWvfmKey('Pulse')
-##     AWG_trig_out(1)    
-##     
-##     #Set picoscope up to collect data and wait for external trigger
-##     t_s = 4*ns
-##     r_l = 20*us
-##     t_sample,res = pico.run_rapid_block(ps, Vrange = voltRange, n_captures = shots, t_sample = t_s, record_length = r_l)
-##     n_data = r_l/t_s
-##     sleep(0.1)
-##     
-##     #CH3 trigger picoscope.
-##     #CH5 suppress carrier EOM.
-##     #CH1 Open RF switch for AWG.
-##     for i in range(shots):
-##     #1ms allows for a time gap between each shot
-##         pb.Sequence([(['ch5'], 0.5*us), 
-##         (['ch5'], 0.5*us, WAIT), 
-##         (['ch5'], 49.5*us),
-##         (['ch3','ch5'], 0.5*us), 
-##         (['ch1','ch5'],50*us), 
-##         (['ch5'], 1*ms)] ,loop=False,bStart=False)
-##         
-##     sleep(0.1)
-##     
-##     #Get data from picoscope
-##     data = pico.get_data_from_rapid_block(ps)
-##     t = np.arange(data.shape[1])*t_s
-##     data_total = np.vstack([t,data])
-##     data_total = data_total.T
-##     
-##     AWG_trig_out(0)
-##     #Save formatted data.
-##     file_name = time.strftime("C:\Users\Milos\Desktop\James\\" + "%Y-%m-%d Pico " + f_ext + '.mat')
-
-##     
-##     sci.savemat(file_name, {'Vrange': voltRange,'sampleRate': t_s,'data': data_total})
-##     plt.plot(t*1e6,data[0,:])
-##     plt.xlabel('us')
-##     plt.show()
+    
+    
 
 
 
 
-        
-    ##     pulse_test()
-
-    ##     make_AFC(n = teeth, bjt = 500, burn_f = burn_f, hyperfine = h_state, f_ext = 'AFC echo',
-    ##     bandwidth = 4.5*MHz, record = "False", shots = 1)
-        
-    ##     wf_13_cw(137.5,-10)
-##     wf_24_cw(burn_f + 10e6 + 460.99e6, -10)
-##     reference_pulse(f_ext='ref test')
-##     make_AFC(n=teeth, bjt=500, burn_f=burn_f, hyperfine=h_state, f_ext = 'wide,300kHz,spacing,1.2MHz', record = "True", shots = 10)
-        
-        
-        
+     
         
         
         
@@ -943,41 +599,4 @@ if __name__ == "__main__":
     
     
     
-    
-    
-    
-##     SpecAn.write('CF ' + str(1.45*GHz))
-##     SpecAn.write('SP ' + str(2.90*GHz))
-    
 
-    
-    
-##     burn_f = 1.15*GHz
-##     hyperfine = ['-7,2']
-##     hyperfine = ['1,2']
-##     for k in range(len(hyperfine)):
-##     for k in range(1):
-    
-    ##     hyperfine = '3,2'
-##     spin_pump_seq(spintime = 10*s, SpecAnSweep = 'Y', rec = 'Y')
-##     SIH.free_run_plot_window('Y', full_span = 'Y')
-
-        #Record some on the Delta m = 1, Spinpump first
-##         save_offset_custom(SpecAn, 5, "1.txt",freq = burn_f + 1443*MHz, span = 40*MHz, res = 30*kHz, sweep = 50*ms)
-##         save_offset_custom(SpecAn, 5, "2.txt",freq = burn_f + 1472*MHz, span = 20*MHz, res = 30*kHz, sweep = 50*ms)
-##         save_offset_custom(SpecAn, 5, "3.txt",freq = burn_f + 1529*MHz, span = 20*MHz, res = 30*kHz, sweep = 50*ms)
-
-##         spin_jump(burn_f,state = hyperfine[k],rec = 'True', span = 10*MHz, teeth = n)  
-##         record_dm_1(burn_f, hyperfine[k])
-##         SpecAn.write('SRCPWR -10')
-    
-    
-##     hb.full_sweep(SpecAn)
-##     sleep(0.1)
-##     SIH.free_run_plot_window('Y', full_span = 'Y')
-
-    #To change SpecAn Power, values between -10 and 2. -10 being default
-##     SpecAn.write('SRCPWR -10')
-
-
-        

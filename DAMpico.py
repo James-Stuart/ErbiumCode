@@ -39,21 +39,15 @@ class DockAreaManager(object):
         saveBtn = pg.QtGui.QPushButton('Save state')
         restoreBtn = pg.QtGui.QPushButton('Restore state')
         restoreBtn.setEnabled(False)
-#==============================================================================
-#         pauseBtn = pg.QtGui.QPushButton('Pause graph') #pauseBtn
-#==============================================================================
+        pauseBtn = pg.QtGui.QPushButton('Pause graph') #pauseBtn
         w1.addWidget(label, row=0, col=0)
         w1.addWidget(saveBtn, row=1, col=0)
         w1.addWidget(restoreBtn, row=2, col=0)
-#==============================================================================
-#         w1.addWidget(pauseBtn, row=3, col=0) #pauseBtn
-#==============================================================================
+        w1.addWidget(pauseBtn, row=3, col=0) #pauseBtn
         saveDock.addWidget(w1)
         saveBtn.clicked.connect(self.save)
         restoreBtn.clicked.connect(self.load)
-#==============================================================================
-#         pauseBtn.clicked.connect(self.pause) #pauseBtn
-#==============================================================================
+        pauseBtn.clicked.connect(self.pause) #pauseBtn
         self.saveBtn=saveBtn
         self.restoreBtn=restoreBtn
         self.area.addDock(saveDock)
@@ -61,7 +55,7 @@ class DockAreaManager(object):
         
     def pause(self):
         ''' A button toggles if the graph is updating. '''
-        self.isPaused = (self.isPaused+1)%2 #flip the bool
+        self.isPaused = not self.isPaused
 
 
     def save(self):
